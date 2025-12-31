@@ -211,7 +211,7 @@ bool osd_get_physical_drive_geometry(const char *filename, uint32_t *cylinders, 
 //  osd_uchar_from_osdchar
 //============================================================
 
-int osd_uchar_from_osdchar(char32_t *uchar, const char *osdchar, size_t count) noexcept
+int osd_uchar_from_osdchar(char32_t *uchar, const char *osdchar, size_t count)
 {
 	// we assume a standard 1:1 mapping of characters to the first 256 unicode characters
 	*uchar = (uint8_t)*osdchar;
@@ -238,14 +238,14 @@ osd::directory::entry::ptr osd_stat(const std::string &path)
 	auto const resultname = reinterpret_cast<char *>(result) + sizeof(*result);
 	std::strcpy(resultname, path.c_str());
 	result->name = resultname;
-	result->type = ENTTYPE_NONE;
+	result->type = osd::directory::entry::entry_type::NONE;
 	result->size = 0;
 
 	FILE *const f = std::fopen(path.c_str(), "rb");
 	if (f)
 	{
 		std::fseek(f, 0, SEEK_END);
-		result->type = ENTTYPE_FILE;
+		result->type = osd::directory::entry::entry_type::FILE;
 		result->size = std::ftell(f);
 		std::fclose(f);
 	}
