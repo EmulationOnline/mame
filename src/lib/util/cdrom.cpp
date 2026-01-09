@@ -37,6 +37,8 @@ struct FsFuncs
 	size_t (*write)(const void *ptr, size_t size, size_t nmemb, void *stream);
 	int (*seek)(void *stream, long offset, int whence);
 	long (*tell)(void *stream);
+	int (*eof)(void *stream);
+	char *(*gets)(char *s, int size, void *stream);
 };
 
 static void *stdio_open(const char *filename, const char *mode)
@@ -69,13 +71,25 @@ static long stdio_tell(void *stream)
 	return ftell((FILE *)stream);
 }
 
+static int stdio_eof(void *stream)
+{
+	return feof((FILE *)stream);
+}
+
+static char *stdio_gets(char *s, int size, void *stream)
+{
+	return fgets(s, size, (FILE *)stream);
+}
+
 static FsFuncs s_fsFuncs = {
 	.open = stdio_open,
 	.close = stdio_close,
 	.read = stdio_read,
 	.write = stdio_write,
 	.seek = stdio_seek,
-	.tell = stdio_tell
+	.tell = stdio_tell,
+	.eof = stdio_eof,
+	.gets = stdio_gets
 };
 
 
@@ -1828,17 +1842,17 @@ uint32_t cdrom_file::parse_wav_sample(std::string_view filename, uint32_t *datao
  * @return  The uint 16.
  */
 
-uint16_t cdrom_file::read_uint16(FILE *infile)
+uint16_t cdrom_file::read_uint16(void *infile)
 {
 	unsigned char buffer[2];
 
-	fread(buffer, 2, 1, infile);
+	s_fsFuncs.read(buffer, 2, 1, infile);
 
 	return get_u16be(buffer);
 }
 
 /**
- * @fn  uint32_t read_uint32(FILE *infile)
+ * @fn  uint32_t read_uint32(void *infile)
  *
  * @brief   Reads uint 32.
  *
@@ -1847,17 +1861,17 @@ uint16_t cdrom_file::read_uint16(FILE *infile)
  * @return  The uint 32.
  */
 
-uint32_t cdrom_file::read_uint32(FILE *infile)
+uint32_t cdrom_file::read_uint32(void *infile)
 {
 	unsigned char buffer[4];
 
-	fread(buffer, 4, 1, infile);
+	s_fsFuncs.read(buffer, 4, 1, infile);
 
 	return get_u32be(buffer);
 }
 
 /**
- * @fn  uint64_t read_uint64(FILE *infile)
+ * @fn  uint64_t read_uint64(void *infile)
  *
  * @brief   Reads uint 64.
  *
@@ -1866,11 +1880,11 @@ uint32_t cdrom_file::read_uint32(FILE *infile)
  * @return  The uint 64.
  */
 
-uint64_t cdrom_file::read_uint64(FILE *infile)
+uint64_t cdrom_file::read_uint64(void *infile)
 {
 	unsigned char buffer[8];
 
-	fread(buffer, 8, 1, infile);
+	s_fsFuncs.read(buffer, 8, 1, infile);
 
 	return get_u64be(buffer);
 }
