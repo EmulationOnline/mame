@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -DCRLF=2 -I../osd -I../lib/util -I../../3rdparty -I../../3rdparty/zlib -I../../3rdparty/flac/include -I../../3rdparty/utf8proc
-LIBS = -lz -lFLAC -lzstd -lpthread
+LIBS = -lFLAC -lzstd -lpthread
 
 SRCS = chdman.cpp \
        version.cpp \
@@ -37,6 +37,7 @@ SRCS = chdman.cpp \
        ../../3rdparty/lzma/C/Threads.c \
        ../../3rdparty/lzma/C/CpuArch.c \
        ../../3rdparty/lzma/C/LzFindOpt.c \
+	   $(wildcard ../../3rdparty/zlib/*.c) \
        ../../3rdparty/utf8proc/utf8proc.c
 
 OBJS = $(SRCS:.cpp=.o)
@@ -44,6 +45,12 @@ OBJS := $(OBJS:.c=.o)
 
 chdman: $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
+
+EMCXX=~/external/emscripten/em++
+OBJ_JS := $(OBJ_JS:.c=.js)
+WASMFLAGS=-Wl,--no-entry -Wl,--export-all -s EXPORTED_FUNCTIONS=$(EXPORTS) -s EXPORTED_RUNTIME_METHODS=['HEAPU8'] -DISWASM -sALLOW_MEMORY_GROWTH
+chdman.js: $(OBJ_JS)
+	$(EMCXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
 
 .PHONY: clean deps
 deps:
