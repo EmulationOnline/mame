@@ -4,6 +4,8 @@ set -e
 # Build chdman
 make chdman
 
+rm -f test.chd # remove old output if present.
+
 # Create a dummy bin file (1MB of zeros)
 dd if=/dev/zero of=test.bin bs=1024 count=1024 2>/dev/null
 

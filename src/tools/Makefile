@@ -50,9 +50,13 @@ chdman: $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
 
 EMCXX=~/external/emscripten/em++
-OBJ_JS := $(OBJ_JS:.c=.js)
+OBJ_JS := $(OBJS:.o=.js)
 WASMFLAGS=-Wl,--no-entry -Wl,--export-all -s EXPORTED_FUNCTIONS=$(EXPORTS) -s EXPORTED_RUNTIME_METHODS=['HEAPU8'] -DISWASM -sALLOW_MEMORY_GROWTH
-chdman.js: $(OBJ_JS)
+%.js: %.c
+	$(EMCC) $(CXXFLAGS) -o $@ $^ $(LIBS)
+%.js: %.cpp
+	$(EMCXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
+chdmain.js: $(OBJ_JS)
 	$(EMCXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
 
 .PHONY: clean deps
