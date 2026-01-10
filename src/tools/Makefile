@@ -1,6 +1,7 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -DCRLF=2 -I../osd -I../lib/util -I../../3rdparty -I../../3rdparty/zlib -I../../3rdparty/flac/include -I../../3rdparty/utf8proc
-LIBS = -lFLAC -lpthread
+CXXFLAGS = -std=c++17 -DCRLF=2 -I../osd -I../lib/util -I../../3rdparty -I../../3rdparty/zlib -I../../3rdparty/flac/include -I../../3rdparty/flac/src/libFLAC/include/ -I../../3rdparty/utf8proc
+CFLAGS = -DPACKAGE_VERSION="\"chdweb_emulationonline\"" -DCRLF=2 -I../osd -I../lib/util -I../../3rdparty -I../../3rdparty/zlib -I../../3rdparty/flac/include -I../../3rdparty/flac/src/libFLAC/include/ -I../../3rdparty/utf8proc -DHAVE_LROUND -DFLAC__HAS_OGG=0 -DHAVE_STDINT_H -DHAVE_INTTYPES_H
+LIBS = -lpthread
 
 SRCS = chdman.cpp \
        version.cpp \
@@ -38,6 +39,7 @@ SRCS = chdman.cpp \
        ../../3rdparty/lzma/C/CpuArch.c \
        ../../3rdparty/lzma/C/LzFindOpt.c \
 	   $(wildcard ../../3rdparty/zlib/*.c) \
+	   $(filter-out %ogg_decoder_aspect.c %ogg_encoder_aspect.c %ogg_helper.c %ogg_mapping.c, $(wildcard ../../3rdparty/flac/src/libFLAC/*.c)) \
        ../../3rdparty/utf8proc/utf8proc.c
 
 OBJS = $(SRCS:.cpp=.o)
