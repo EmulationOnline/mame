@@ -5,13 +5,26 @@
 </head>
 <body>
     <h1>CHDMain Version Test</h1>
-    <textarea id="log" rows="10" cols="80"></textarea>
+    <div>
+        <label for="folderInput">Upload Folder:</label>
+        <input type="file" id="folderInput" webkitdirectory directory multiple>
+    </div>
+    <br>
+    <textarea id="log" rows="20" cols="100"></textarea>
     <script>
         var logElement = document.getElementById('log');
         function log(text) {
             logElement.value += text + "\n";
             console.log(text);
         }
+
+        document.getElementById('folderInput').addEventListener('change', function(e) {
+            var files = e.target.files;
+            log("Folder uploaded. Found " + files.length + " files.");
+            for (var i = 0; i < files.length; i++) {
+                log("File: " + (files[i].webkitRelativePath || files[i].name));
+            }
+        });
 
         var Module = {
             preRun: [],
