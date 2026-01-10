@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CHDMain Test</title>
+</head>
+<body>
+    <h1>CHDMain Version Test</h1>
+    <textarea id="log" rows="10" cols="80"></textarea>
+    <script>
+        var logElement = document.getElementById('log');
+        function log(text) {
+            logElement.value += text + "\n";
+            console.log(text);
+        }
+
+        var Module = {
+            preRun: [],
+            postRun: [],
+            print: function(text) {
+                log("stdout: " + text);
+            },
+            printErr: function(text) {
+                log("stderr: " + text);
+            },
+            onRuntimeInitialized: function() {
+                log("Runtime initialized.");
+                try {
+                    // chdmain_version is exported via EMSCRIPTEN_KEEPALIVE, so it should be available as _chdmain_version
+                    if (typeof Module._chdmain_version === 'function') {
+                        var version = Module._chdmain_version();
+                        log("chdmain_version returned: " + version);
+                    } else {
+                        log("Module._chdmain_version is not a function. Checking exports...");
+                         // Sometimes it might not be directly on Module if not exported via command line but KEEPALIVE should work.
+                         // Maybe it needs ccall or cwrap if not directly exposed, but usually _func works.
+                         log("Keys in Module: " + Object.keys(Module).filter(k => k.indexOf('chdmain') !== -1));
+                    }
+                } catch(e) {
+                    log("Error calling chdmain_version: " + e);
+                }
+            }
+        };
+    </script>
+    <script src="chdmain.js"></script>
+</body>
+</html>

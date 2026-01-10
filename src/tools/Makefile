@@ -49,19 +49,24 @@ OBJS := $(OBJS:.c=.o)
 chdman: $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
 
-EMCXX=~/external/emscripten/em++
-OBJ_JS := $(OBJS:.o=.js)
-WASMFLAGS=-Wl,--no-entry -Wl,--export-all -s EXPORTED_FUNCTIONS=$(EXPORTS) -s EXPORTED_RUNTIME_METHODS=['HEAPU8'] -DISWASM -sALLOW_MEMORY_GROWTH
-%.js: %.c
-	$(EMCC) $(CXXFLAGS) -o $@ $^ $(LIBS)
-%.js: %.cpp
-	$(EMCXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
+EMCC = emcc
+EMCXX = em++
+OBJ_JS := $(SRCS:.cpp=.bc)
+OBJ_JS := $(OBJ_JS:.c=.bc)
+WASMFLAGS=-s EXPORTED_RUNTIME_METHODS=['HEAPU8'] -DISWASM -sALLOW_MEMORY_GROWTH
+
+%.bc: %.c
+	$(EMCC) $(CFLAGS) -c -o $@ $<
+%.bc: %.cpp
+	$(EMCXX) $(CXXFLAGS) -c -o $@ $<
+
 chdmain.js: $(OBJ_JS)
-	$(EMCXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
+	$(EMCXX) $(CXXFLAGS) $(WASMFLAGS) -o $@ $^ $(LIBS)
+
 
 .PHONY: clean deps
 deps:
 	apt-get update && apt-get install -y libflac-dev libzstd-dev
 
 clean:
-	rm -f $(OBJS) chdman
+	rm -f $(OBJS) chdman chdmain.js

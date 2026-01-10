@@ -43,6 +43,16 @@
 
 using util::string_format;
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+extern "C" {
+EMSCRIPTEN_KEEPALIVE
+int chdmain_version() {
+    return 1;
+}
+}
+#endif
+
 
 
 //**************************************************************************
