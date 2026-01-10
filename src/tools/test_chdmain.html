@@ -15,14 +15,29 @@
         var logElement = document.getElementById('log');
         function log(text) {
             logElement.value += text + "\n";
+            logElement.scrollTop = logElement.scrollHeight;
             console.log(text);
         }
 
-        document.getElementById('folderInput').addEventListener('change', function(e) {
+        document.getElementById('folderInput').addEventListener('change', async function(e) {
             var files = e.target.files;
             log("Folder uploaded. Found " + files.length + " files.");
             for (var i = 0; i < files.length; i++) {
                 log("File: " + (files[i].webkitRelativePath || files[i].name));
+            }
+
+            if (files.length > 0) {
+                var file = files[0];
+                log("Computing SHA-256 for first file: " + (file.webkitRelativePath || file.name));
+                try {
+                    var arrayBuffer = await file.arrayBuffer();
+                    var hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+                    var hashArray = Array.from(new Uint8Array(hashBuffer));
+                    var hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                    log("SHA-256: " + hashHex);
+                } catch (err) {
+                    log("Error computing hash: " + err);
+                }
             }
         });
 
