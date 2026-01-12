@@ -4,6 +4,7 @@
 *.orig
 *.pyc
 *.pyo
+*.o
 *.rej
 *.L68
 *.S68
@@ -49,3 +50,4 @@ regtests/chdman/temp
 regtests/jedutil/output
 /CMakeLists.txt
 /samples
+/src/tools/chdman

@@ -45,6 +45,9 @@ OBJS := $(OBJS:.c=.o)
 chdman: $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
 
-.PHONY: clean
+.PHONY: clean deps
+deps:
+	apt-get update && apt-get install -y libflac-dev libzstd-dev
+
 clean:
 	rm -f $(OBJS) chdman

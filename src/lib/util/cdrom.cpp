@@ -29,6 +29,56 @@
 #include <tuple>
 
 
+struct FsFuncs
+{
+	void *(*open)(const char *filename, const char *mode);
+	int (*close)(void *stream);
+	size_t (*read)(void *ptr, size_t size, size_t nmemb, void *stream);
+	size_t (*write)(const void *ptr, size_t size, size_t nmemb, void *stream);
+	int (*seek)(void *stream, long offset, int whence);
+	long (*tell)(void *stream);
+};
+
+static void *stdio_open(const char *filename, const char *mode)
+{
+	return (void *)fopen(filename, mode);
+}
+
+static int stdio_close(void *stream)
+{
+	return fclose((FILE *)stream);
+}
+
+static size_t stdio_read(void *ptr, size_t size, size_t nmemb, void *stream)
+{
+	return fread(ptr, size, nmemb, (FILE *)stream);
+}
+
+static size_t stdio_write(const void *ptr, size_t size, size_t nmemb, void *stream)
+{
+	return fwrite(ptr, size, nmemb, (FILE *)stream);
+}
+
+static int stdio_seek(void *stream, long offset, int whence)
+{
+	return fseek((FILE *)stream, offset, whence);
+}
+
+static long stdio_tell(void *stream)
+{
+	return ftell((FILE *)stream);
+}
+
+static FsFuncs s_fsFuncs = {
+	.open = stdio_open,
+	.close = stdio_close,
+	.read = stdio_read,
+	.write = stdio_write,
+	.seek = stdio_seek,
+	.tell = stdio_tell
+};
+
+
 /***************************************************************************
     DEBUGGING
 ***************************************************************************/
