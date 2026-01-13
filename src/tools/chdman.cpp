@@ -3567,6 +3567,9 @@ EM_JS(int, callNumFiles, (), {
 EM_JS(uint8_t*, callBuffer, (int n), {
     return window.wasmFileBuffer(n);
 });
+EM_JS(const char*, callPath, (int n), {
+    return window.wasmFilePath(n);
+});
 
 EMSCRIPTEN_KEEPALIVE
 void chdWebEntry() {
@@ -3576,7 +3579,7 @@ void chdWebEntry() {
     int n = callNumFiles();
     printf("Num files: %d\n", n);
     for (int i = 0; i < n; i++) {
-        printf("file %d\n", i);
+        printf("file %d = %s\n", i, callPath(i));
         for (int j = 0; j < 10; j++) {
             uint8_t* ptr = callBuffer(i);
             printf("[%d] = %hhu\n", j, ptr[j]);
