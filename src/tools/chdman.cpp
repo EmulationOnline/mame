@@ -3561,12 +3561,16 @@ int chdmain_version() {
 EM_JS(int, callWasmVersion, (), {
     return window.wasmVersion();
 });
+EM_JS(int, callNumFiles, (), {
+    return window.wasmNumFiles();
+});
 
 EMSCRIPTEN_KEEPALIVE
 void chdWebEntry() {
     puts("wasm: chdWeb entrypoint invoked");
     int ver = callWasmVersion();
     printf("Got version from wasm: %d\n", ver);
+    printf("Num files: %d\n", callNumFiles());
     parameters_map params;
     std::string input = "dummy.cue";
     std::string output = "dummy.chd";
