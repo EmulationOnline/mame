@@ -56,20 +56,26 @@
                 log('Done');
                 const size = data.byteLength;
                 let wasmHeap = Module._malloc(size);
-                Module.HEAPU8.set(data, wasmHeap);
+                let write = new Uint8Array(Module.HEAPU8.buffer,
+                        wasmHeap, size);
                 let view = new Uint8Array(data);
+                write.set(view);
                 for (let j = 0; j < 10; j++) {
-                    log(`js f=${i}: ${j} = ${view[j]}`);
+                    log(`js f=${i}: ${j} = ${write[j]} vs ${view[j]}`);
                 }
-                wasm[path] = {
+                wasm.push({
+                    jsName: path,
                     ptr: wasmHeap,
                     size: data.byteLength,
-                };
+                });
             }
             log('Finished listing files');
             window.files = wasm;
         }
 
+        function wasmGetFiles() {
+            return window.files || {};
+        }
         function wasmNumFiles() {
             let files = wasmGetFiles();
             return files.length;
@@ -77,14 +83,13 @@
         function getFile(n) {
             let files = wasmGetFiles();
             if (n >= 0 && n < wasmNumFiles()) {
-                return files[n].ptr;
+                return files[n];
             } else {
                 return 0;
             }
         }
         function wasmFileBuffer(n) {
             // buffers are addresses allocated on the wasm heap.
-            log('looking for: ' + n);
             return getFile(n).ptr;
         }
         function wasmFileSize(filename) {

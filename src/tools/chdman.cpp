@@ -3564,13 +3564,25 @@ EM_JS(int, callWasmVersion, (), {
 EM_JS(int, callNumFiles, (), {
     return window.wasmNumFiles();
 });
+EM_JS(uint8_t*, callBuffer, (int n), {
+    return window.wasmFileBuffer(n);
+});
 
 EMSCRIPTEN_KEEPALIVE
 void chdWebEntry() {
     puts("wasm: chdWeb entrypoint invoked");
     int ver = callWasmVersion();
     printf("Got version from wasm: %d\n", ver);
-    printf("Num files: %d\n", callNumFiles());
+    int n = callNumFiles();
+    printf("Num files: %d\n", n);
+    for (int i = 0; i < n; i++) {
+        printf("file %d\n", i);
+        for (int j = 0; j < 10; j++) {
+            uint8_t* ptr = callBuffer(i);
+            printf("[%d] = %hhu\n", j, ptr[j]);
+        }
+    }
+
     parameters_map params;
     std::string input = "dummy.cue";
     std::string output = "dummy.chd";
