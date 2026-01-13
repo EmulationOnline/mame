@@ -43,15 +43,6 @@
 
 using util::string_format;
 
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-extern "C" {
-EMSCRIPTEN_KEEPALIVE
-int chdmain_version() {
-    return 1;
-}
-}
-#endif
 
 
 
@@ -2171,10 +2162,18 @@ static void do_create_hd(parameters_map &params)
 
 static void do_create_cd(parameters_map &params)
 {
+    for (const auto& p : params) {
+        printf("param %s -> %s\n", p.first.c_str(), p.second->c_str());
+    }
 	// process input file
 	cdrom_file::track_input_info track_info;
 	cdrom_file::toc toc = { 0 };
 	auto input_file_str = params.find(OPTION_INPUT);
+    printf("-i: %s\n", input_file_str->second->c_str());
+
+	auto _unused_out_str = params.find(OPTION_OUTPUT);
+    printf("-o: %s\n", _unused_out_str->second->c_str());
+
 	if (input_file_str != params.end())
 	{
 		std::error_condition err = cdrom_file::parse_toc(*input_file_str->second, toc, track_info);
@@ -3550,3 +3549,32 @@ int CLIB_DECL main(int argc, char *argv[])
 	// print generic help if nothing found
 	return print_help(args[0]);
 }
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+extern "C" {
+EMSCRIPTEN_KEEPALIVE
+int chdmain_version() {
+    return 1;
+}
+
+EM_JS(int, callWasmVersion, (), {
+    return window.wasmVersion();
+});
+
+EMSCRIPTEN_KEEPALIVE
+void chdWebEntry() {
+    puts("wasm: chdWeb entrypoint invoked");
+    int ver = callWasmVersion();
+    printf("Got version from wasm: %d\n", ver);
+    parameters_map params;
+    std::string input = "dummy.cue";
+    std::string output = "dummy.chd";
+    params[OPTION_INPUT] = &input;
+    params[OPTION_OUTPUT] =  &output;
+    do_create_cd(params);
+}
+
+
+}  // extern "C"
+#endif

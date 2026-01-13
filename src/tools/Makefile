@@ -69,4 +69,4 @@ deps:
 	apt-get update && apt-get install -y libflac-dev libzstd-dev
 
 clean:
-	rm -f $(OBJS) chdman chdmain.js
+	rm -f $(OBJS) $(OBJ_JS) chdman chdmain.js chdmain.wasm
