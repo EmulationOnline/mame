@@ -96,43 +96,80 @@ static char *stdio_gets(char *s, int size, void *stream)
 // };
 // memfile impl for wasm / browser
 
-std::unordered_map<const char*, MemFile> s_memFiles;
+// assumes no files will be added while converting, as
+// pointers to MemFiles are handed out during processing.
+std::vector<MemFile> s_memFiles;
+// file + buffer for the single file created during processing.
 static std::vector<uint8_t> s_outBuffer;
+MemFile s_outFile;
 
 static void *memfile_open(const char *filename, const char *mode) {
-    auto it = s_memFiles.find(filename);
     printf("open %s with %s\n", filename, mode);
+    printf("checking %lu files\n", s_memFiles.size());
+    MemFile* file = nullptr;
+    for (int i = 0; i < s_memFiles.size(); i++) {
+        MemFile* it = &s_memFiles[i];
+        printf("'%s'\n", it->filename);
+        if (strstr(filename, it->filename) == 0) {
+            puts("match!");
+            file = it;
+        }
+    }
+    printf("Found: %d\n", file != nullptr);
 
-    MemFile *f = new MemFile;
-    f->ptr = 0;
-    f->len = 0;
-    f->pos = 0;
-    if (strcmp(mode, "wb") == 0) {
-        puts("Opening out_buffer.");
+    if (strcmp(mode, "wt") == 0) {
+        printf("Opening out_buffer: %s\n", filename);
         s_outBuffer.clear();
-        return f;
-    } else if (strcmp(mode, "rb") == 0) {
-       if(it == s_memFiles.end()) {
+        return &s_outFile;
+    } else if (strcmp(mode, "rt") == 0) {
+       if(!file) {
+         puts("not found");
          return NULL;
        } else {
-           puts("TODO. returning len 0 file.");
-           return f;
+           puts("WIP. returning len 0 file.");
+           return file;
        }
     } else {
         printf("unknown mode for file: %s\n", mode);
         return NULL;
     }
 }
+static int memfile_close(void *stream) {
+    MemFile* f = (MemFile*)stream;
+    f->pos = 0;
+    return 0;
+}
 
+static size_t memfile_read(void *ptr, size_t size, size_t nmemb, void *stream){
+    return 0;
+}
+static size_t memfile_write(const void *ptr, size_t size, size_t nmemb, void *stream){
+    return 0;
+}
+static int memfile_seek(void *stream, long offset, int whence){
+    MemFile* f= (MemFile*)stream;
+    return 0;  // FIXME
+}
+static long memfile_tell(void *stream){
+    MemFile* f= (MemFile*)stream;
+    return f->pos;
+}
+static int memfile_eof(void *stream){
+    MemFile* f= (MemFile*)stream;
+    return f->pos >= f->len;
+}
+static char *memfile_gets(char *s, int size, void *stream){
+    return 0;  // FIXME
+}
 static FsFuncs s_fsFuncs = {
 	.open = memfile_open,
-	.close = stdio_close,
-	.read = stdio_read,
-	.write = stdio_write,
-	.seek = stdio_seek,
-	.tell = stdio_tell,
-	.eof = stdio_eof,
-	.gets = stdio_gets
+	.close = memfile_close,
+	.read = memfile_read,
+	.write = memfile_write,
+	.seek = memfile_seek,
+	.tell = memfile_tell,
+	.eof = memfile_eof,
+	.gets = memfile_gets
 };
 
 
@@ -2452,7 +2489,7 @@ std::error_condition cdrom_file::parse_cue(std::string_view tocfname, toc &outto
 	bool is_multibin = false;
 	int leadin = -1;
 
-	FILE *infile = fopen(path.c_str(), "rt");
+	void *infile = s_fsFuncs.open(path.c_str(), "rt");
 	if (!infile)
 	{
 		return std::error_condition(errno, std::generic_category());
@@ -2477,10 +2514,10 @@ std::error_condition cdrom_file::parse_cue(std::string_view tocfname, toc &outto
 	char linebuffer[512];
 	memset(linebuffer, 0, sizeof(linebuffer));
 
-	while (!feof(infile))
+	while (!s_fsFuncs.eof(infile))
 	{
 		/* get the next line */
-		if (!fgets(linebuffer, 511, infile))
+		if (!s_fsFuncs.gets(linebuffer, 511, infile))
 			break;
 
 		i = 0;
@@ -2591,14 +2628,14 @@ std::error_condition cdrom_file::parse_cue(std::string_view tocfname, toc &outto
 				wavlen = parse_wav_sample(lastfname, &wavoffs);
 				if (!wavlen)
 				{
-					fclose(infile);
+					s_fsFuncs.close(infile);
 					osd_printf_error("ERROR: couldn't read [%s] or not a valid .WAV\n", lastfname);
 					return chd_file::error::INVALID_DATA;
 				}
 			}
 			else
 			{
-				fclose(infile);
+				s_fsFuncs.close(infile);
 				osd_printf_error("ERROR: Unhandled track type %s\n", token);
 				return chd_file::error::UNSUPPORTED_FORMAT;
 			}
@@ -2665,7 +2702,7 @@ std::error_condition cdrom_file::parse_cue(std::string_view tocfname, toc &outto
 			convert_type_string_to_track_info(token, &outtoc.tracks[trknum]);
 			if (outtoc.tracks[trknum].datasize == 0)
 			{
-				fclose(infile);
+				s_fsFuncs.close(infile);
 				osd_printf_error("ERROR: Unknown track type [%s].  Contact MAMEDEV.\n", token);
 				return chd_file::error::UNSUPPORTED_FORMAT;
 			}
@@ -2754,7 +2791,7 @@ std::error_condition cdrom_file::parse_cue(std::string_view tocfname, toc &outto
 	}
 
 	/* close the input CUE */
-	fclose(infile);
+	s_fsFuncs.close(infile);
 
 	/* store the number of tracks found */
 	outtoc.numtrks = trknum + 1;

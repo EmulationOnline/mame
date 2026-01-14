@@ -3580,17 +3580,17 @@ void chdWebEntry() {
     printf("Num files: %d\n", n);
     std::string cuePath;
     for (int i = 0; i < n; i++) {
+        const char* filename = callPath(i);
         MemFile memfile = {
+            .filename = filename,
             .ptr = 0,
             .len = 0,
             .pos = 0,
         };
-        const char* filename = callPath(i);
-        s_memFiles.insert(
-                std::make_pair(filename, memfile));
+        s_memFiles.push_back(memfile);
         const char* cueExt = strstr(filename, ".cue");
         if (cueExt && strlen(cueExt) == 4) {
-            printf("cue found: %s\n", filename);
+            printf("cue found: '%s'\n", filename);
             if (!cuePath.empty()) {
                 puts("Please select a folder with only one .cue file");
                 return;

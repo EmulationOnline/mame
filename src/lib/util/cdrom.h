@@ -25,13 +25,14 @@
 
 // CHDWeb extensions
 struct MemFile {
+    const char* filename;
     uint8_t* ptr;  // if null, write to out_buffer
     size_t len;
     size_t pos;
 };
 
 
-extern std::unordered_map<const char*, MemFile> s_memFiles;
+extern std::vector<MemFile> s_memFiles;
 
 // END CHDWeb
 
