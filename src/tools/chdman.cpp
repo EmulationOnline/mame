@@ -2162,6 +2162,7 @@ static void do_create_hd(parameters_map &params)
 
 static void do_create_cd(parameters_map &params)
 {
+    puts("Creating CHD for CD contents.");
     for (const auto& p : params) {
         printf("param %s -> %s\n", p.first.c_str(), p.second->c_str());
     }
@@ -2176,11 +2177,13 @@ static void do_create_cd(parameters_map &params)
 
 	if (input_file_str != params.end())
 	{
+        puts("Processing Table of Contents...");
 		std::error_condition err = cdrom_file::parse_toc(*input_file_str->second, toc, track_info);
 		if (err)
 			report_error(1, "Error parsing input file (%s: %s)\n", *input_file_str->second, err.message());
 	}
 
+    puts("Processing arguments...");
 	// process output CHD
 	chd_file output_parent;
 	const auto output_chd_str = parse_output_chd_parameters(params, output_parent);
@@ -2197,6 +2200,7 @@ static void do_create_cd(parameters_map &params)
 	// process numprocessors
 	parse_numprocessors(params);
 
+    puts("Computing padding...");
 	// pad each track to a 4-frame boundary. cdrom.cpp will deal with this on the read side
 	uint32_t origtotalsectors = 0;
 	uint32_t totalsectors = 0;
@@ -2219,19 +2223,23 @@ static void do_create_cd(parameters_map &params)
 	util::stream_format(std::cout, "Compression:  %s\n", compression_string(compression));
 	util::stream_format(std::cout, "Logical size: %s\n", big_int_string(uint64_t(totalsectors) * cdrom_file::FRAME_SIZE));
 
+    puts("Starting chd creation...");
 	// catch errors so we can close & delete the output file
 	try
 	{
 		// create the new CD
+        puts("Creating output file...");
 		auto chd = std::make_unique<chd_cd_compressor>(toc, track_info);
 		create_output_chd(*chd, *output_chd_str, uint64_t(totalsectors) * cdrom_file::FRAME_SIZE, hunk_size, cdrom_file::FRAME_SIZE, compression, output_parent);
 
 		// add the standard CD metadata; we do this even if we have a parent because it might be different
+        puts("Adding metadata...");
 		const std::error_condition err = cdrom_file::write_metadata(chd.get(), toc);
 		if (err)
 			report_error(1, "Error adding CD metadata: %s", err.message());
 
 		// compress it generically
+        puts("Compressing data...");
 		compress_common(*chd);
 	}
 	catch (...)
@@ -3570,6 +3578,9 @@ EM_JS(uint8_t*, callBuffer, (int n), {
 EM_JS(const char*, callPath, (int n), {
     return window.wasmFilePath(n);
 });
+EM_JS(size_t, callSize, (int n), {
+    return window.wasmFileSize(n);
+});
 
 EMSCRIPTEN_KEEPALIVE
 void chdWebEntry() {
@@ -3581,10 +3592,12 @@ void chdWebEntry() {
     std::string cuePath;
     for (int i = 0; i < n; i++) {
         const char* filename = callPath(i);
+        size_t len = callSize(i);
+        printf("chdweb: found %s (%lu bytes)\n", filename, len);
         MemFile memfile = {
             .filename = filename,
             .ptr = 0,
-            .len = 0,
+            .len = len,
             .pos = 0,
         };
         s_memFiles.push_back(memfile);
@@ -3611,6 +3624,7 @@ void chdWebEntry() {
     params[OPTION_INPUT] = &input;
     params[OPTION_OUTPUT] =  &output;
     do_create_cd(params);
+    printf("Finished createcd. Output size: %lu bytes\n", s_outBuffer.size());
 }
 
 

@@ -33,6 +33,7 @@ struct MemFile {
 
 
 extern std::vector<MemFile> s_memFiles;
+extern std::vector<uint8_t> s_outBuffer;
 
 // END CHDWeb
 

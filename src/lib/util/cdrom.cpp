@@ -100,7 +100,7 @@ static char *stdio_gets(char *s, int size, void *stream)
 // pointers to MemFiles are handed out during processing.
 std::vector<MemFile> s_memFiles;
 // file + buffer for the single file created during processing.
-static std::vector<uint8_t> s_outBuffer;
+std::vector<uint8_t> s_outBuffer;
 MemFile s_outFile;
 
 static void *memfile_open(const char *filename, const char *mode) {
@@ -110,8 +110,8 @@ static void *memfile_open(const char *filename, const char *mode) {
     for (int i = 0; i < s_memFiles.size(); i++) {
         MemFile* it = &s_memFiles[i];
         printf("'%s'\n", it->filename);
-        if (strstr(filename, it->filename) == 0) {
-            puts("match!");
+        if (strstr(filename, it->filename) != 0) {
+            printf("%s matched\n", filename);
             file = it;
         }
     }
@@ -126,7 +126,9 @@ static void *memfile_open(const char *filename, const char *mode) {
          puts("not found");
          return NULL;
        } else {
-           puts("WIP. returning len 0 file.");
+           printf("returning file(%s) with len: %lu\n",
+                  file->filename, file->len);
+           file->pos = 0;
            return file;
        }
     } else {
@@ -141,25 +143,89 @@ static int memfile_close(void *stream) {
 }
 
 static size_t memfile_read(void *ptr, size_t size, size_t nmemb, void *stream){
-    return 0;
+    puts("mem read");
+    MemFile* f= (MemFile*)stream;
+    size_t bytes_left = f->len - f->pos;
+    size_t items_left = bytes_left / size;
+    size_t items = nmemb < items_left ? nmemb : items_left;
+    memcpy(ptr, f->ptr + f->pos, items * size);
+    f->pos += items * size;
+    return items;
 }
 static size_t memfile_write(const void *ptr, size_t size, size_t nmemb, void *stream){
+    puts("mem read");
+    MemFile* f= (MemFile*)stream;
+    if (f->ptr) {
+        printf("Cannot write to memfile! (f=%s)\n", f->filename);
+        return 0;
+    }
     return 0;
 }
 static int memfile_seek(void *stream, long offset, int whence){
-    MemFile* f= (MemFile*)stream;
-    return 0;  // FIXME
+    puts("mem seek");
+    MemFile* buf = (MemFile*)stream;
+    int newpos = 0;
+    switch (whence) {
+        case SEEK_SET:
+            puts("mem SEEK_SET");
+            // The file offset is set to offset bytes.
+            // NOTE: unix lseek allows increasing size of file / writing
+            // beyond by tracking the 'hole size'. We dont support that
+            // on strings, so will fail if seeked OOB.
+            newpos = offset;
+            break;
+        case SEEK_CUR:
+            puts("mem SEEK_CUR");
+            // The file offset is set to its current location plus offset bytes.
+            newpos = offset + buf->pos;
+            break;
+        case SEEK_END:
+            puts("mem SEEK_END");
+            // The file offset is set to the size of the file plus offset bytes.
+            newpos = offset + buf->len;
+            break;
+        default:
+            printf("unknown WHENCE(%d) for mem_seek, skipping\n", whence);
+            return buf->pos;
+    }
+    if (newpos >= 0 && newpos < buf->len) {
+        buf->pos = newpos;
+    } else {
+        puts("Cannot mem_seek OOB, ignoring.");
+    }
+    return buf->pos;
 }
 static long memfile_tell(void *stream){
+    puts("mem tell");
     MemFile* f= (MemFile*)stream;
     return f->pos;
 }
 static int memfile_eof(void *stream){
+    puts("mem eof()");
     MemFile* f= (MemFile*)stream;
+    printf("current pos: %lu / %lu\n", f->pos, f->len);
     return f->pos >= f->len;
 }
 static char *memfile_gets(char *s, int size, void *stream){
-    return 0;  // FIXME
+    puts("mem gets");
+    MemFile* f= (MemFile*)stream;
+    char *const dst = s;
+    if (f->pos >= f->len) {
+        // at eof, no bytes will be returned
+        return NULL;
+    }
+    for (int i = 0; i < size && f->pos < f->len; i++) {
+        char c = f->ptr[f->pos];
+        f->pos++;
+        if (c == '\n' || c == '\r' || c == '\0') {
+            break;
+        }
+        *s = c;
+        s++;
+    }
+
+    // return dst on success
+    return dst;
 }
 static FsFuncs s_fsFuncs = {
 	.open = memfile_open,
@@ -2479,6 +2545,7 @@ std::error_condition cdrom_file::parse_gdi(std::string_view tocfname, toc &outto
 
 std::error_condition cdrom_file::parse_cue(std::string_view tocfname, toc &outtoc, track_input_info &outinfo)
 {
+    puts("Parsing cue file...");
 	int i, trknum, sessionnum, session_pregap;
 	char token[512];
 	std::string lastfname;
@@ -3064,10 +3131,12 @@ bool cdrom_file::is_gdicue(std::string_view tocfname)
 
 std::error_condition cdrom_file::parse_toc(std::string_view tocfname, toc &outtoc, track_input_info &outinfo)
 {
+    puts("parsing toc...");
 	char token[512];
 
 	auto pos = tocfname.rfind('.');
 	std::string tocfext = pos == std::string_view::npos ? std::string() : strmakelower(tocfname.substr(pos + 1));
+    printf("got tocftext: %s\n", tocfext.c_str());
 
 	if (tocfext == "gdi")
 	{
@@ -3076,6 +3145,7 @@ std::error_condition cdrom_file::parse_toc(std::string_view tocfname, toc &outto
 
 	if (tocfext == "cue")
 	{
+        puts("parsing cue...");
 		return parse_cue(tocfname, outtoc, outinfo);
 	}
 
