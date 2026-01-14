@@ -4,11 +4,18 @@
     <title>CHDMain Test</title>
 </head>
 <body>
-    <h1>CHDMain Version Test</h1>
+    <h1>CHDWeb: Convert your cue+bin files into a chd</h1>
+    <h2>Compress your library to half its size, and make it easier to organize.</h2>
+    <p>Visit our CD Filetypes page to learn more.</p>
+    <p>TODO: purposes: 1. easier to organize 2. support shiny new emulator 3. reduce space requirements for your game collection</p>
     <div>
         <label for="folderInput">Upload Folder:</label>
         <input type="file" id="folderInput" webkitdirectory directory multiple>
     </div>
+    <p>Tips: This tool uses a lot of memory. For efficiency, select a folder
+        with only a single .cue file, and only the .bin files needed by that
+        .cue file.
+    </p>
     <br>
     <textarea id="log" rows="20" cols="100"></textarea>
     <script>

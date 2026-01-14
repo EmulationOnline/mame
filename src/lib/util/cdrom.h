@@ -20,7 +20,20 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <unordered_map>
 
+
+// CHDWeb extensions
+struct MemFile {
+    uint8_t* ptr;  // if null, write to out_buffer
+    size_t len;
+    size_t pos;
+};
+
+
+extern std::unordered_map<const char*, MemFile> s_memFiles;
+
+// END CHDWeb
 
 class cdrom_file {
 public:

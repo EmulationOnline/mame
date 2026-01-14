@@ -27,6 +27,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <tuple>
+#include <unordered_map>
 
 
 struct FsFuncs
@@ -81,8 +82,50 @@ static char *stdio_gets(char *s, int size, void *stream)
 	return fgets(s, size, (FILE *)stream);
 }
 
+
+// filesystem impl for local testing
+// static FsFuncs s_fsFuncs = {
+// 	.open = stdio_open,
+// 	.close = stdio_close,
+// 	.read = stdio_read,
+// 	.write = stdio_write,
+// 	.seek = stdio_seek,
+// 	.tell = stdio_tell,
+// 	.eof = stdio_eof,
+// 	.gets = stdio_gets
+// };
+// memfile impl for wasm / browser
+
+std::unordered_map<const char*, MemFile> s_memFiles;
+static std::vector<uint8_t> s_outBuffer;
+
+static void *memfile_open(const char *filename, const char *mode) {
+    auto it = s_memFiles.find(filename);
+    printf("open %s with %s\n", filename, mode);
+
+    MemFile *f = new MemFile;
+    f->ptr = 0;
+    f->len = 0;
+    f->pos = 0;
+    if (strcmp(mode, "wb") == 0) {
+        puts("Opening out_buffer.");
+        s_outBuffer.clear();
+        return f;
+    } else if (strcmp(mode, "rb") == 0) {
+       if(it == s_memFiles.end()) {
+         return NULL;
+       } else {
+           puts("TODO. returning len 0 file.");
+           return f;
+       }
+    } else {
+        printf("unknown mode for file: %s\n", mode);
+        return NULL;
+    }
+}
+
 static FsFuncs s_fsFuncs = {
-	.open = stdio_open,
+	.open = memfile_open,
 	.close = stdio_close,
 	.read = stdio_read,
 	.write = stdio_write,

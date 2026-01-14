@@ -3578,17 +3578,36 @@ void chdWebEntry() {
     printf("Got version from wasm: %d\n", ver);
     int n = callNumFiles();
     printf("Num files: %d\n", n);
+    std::string cuePath;
     for (int i = 0; i < n; i++) {
-        printf("file %d = %s\n", i, callPath(i));
-        for (int j = 0; j < 10; j++) {
-            uint8_t* ptr = callBuffer(i);
-            printf("[%d] = %hhu\n", j, ptr[j]);
+        MemFile memfile = {
+            .ptr = 0,
+            .len = 0,
+            .pos = 0,
+        };
+        const char* filename = callPath(i);
+        s_memFiles.insert(
+                std::make_pair(filename, memfile));
+        const char* cueExt = strstr(filename, ".cue");
+        if (cueExt && strlen(cueExt) == 4) {
+            printf("cue found: %s\n", filename);
+            if (!cuePath.empty()) {
+                puts("Please select a folder with only one .cue file");
+                return;
+            }
+            cuePath = filename;
         }
+    //     printf("file %d = %s\n", i, callPath(i));
+    //     for (int j = 0; j < 10; j++) {
+    //         uint8_t* ptr = callBuffer(i);
+    //         printf("[%d] = %hhu\n", j, ptr[j]);
+    //     }
     }
 
     parameters_map params;
-    std::string input = "dummy.cue";
-    std::string output = "dummy.chd";
+    std::string input = cuePath;
+    std::string output = cuePath;
+    memcpy(output.data() + (cuePath.size() - 3), "chd", 3);
     params[OPTION_INPUT] = &input;
     params[OPTION_OUTPUT] =  &output;
     do_create_cd(params);
