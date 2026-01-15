@@ -3690,6 +3690,28 @@ void demo_slurp_files(const char* cuefile, const char* binfile) {
     setup_memfile(binfile);
 }
 
+void write_file_bytes(const char* filename, const std::vector<uint8_t>& data) {
+    int fd = open(filename, O_CREAT | O_TRUNC | O_WRONLY , 0700);
+    if (fd == -1) {
+        perror("failed to open:");
+        return;
+    }
+    const uint8_t* wr = data.data();
+    int size = data.size();
+    printf("saving to %s\n", filename);
+    while(size > 0) {
+        ssize_t count = write(fd, wr, size);
+        if (count < 0) {
+            perror("write failed: ");
+            exit(1);
+            return;
+        }
+        size -= count;
+        wr += count;
+    }
+    close(fd);
+}
+
 int demo_main(int argc, const char **argv) {
     // new main using the wasm entry point, to better exercise the memfile
     // codepaths natively with a debugger.
@@ -3711,6 +3733,7 @@ int demo_main(int argc, const char **argv) {
     // params[OPTION_NUMPROCESSORS] = &procs;  // Add for wasm.
     do_create_cd(params);
     printf("generated output size: %ld bytes\n", s_outBuffer.size());
+    write_file_bytes(outfile, s_outBuffer);
     return 0;
 }
 
