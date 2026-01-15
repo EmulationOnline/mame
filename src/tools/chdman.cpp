@@ -971,7 +971,11 @@ static void progress(bool forceit, Format &&fmt, Params &&...args)
 
 	// standard vfprintf stuff here
 	util::stream_format(std::cerr, std::forward<Format>(fmt), std::forward<Params>(args)...);
+#ifdef __EMSCRIPTEN__
+	std::cerr << std::endl;
+#else
 	std::cerr << std::flush;
+#endif
 }
 
 
@@ -3569,23 +3573,24 @@ int chdmain_version() {
 }
 
 EM_JS(int, callWasmVersion, (), {
-    return window.wasmVersion();
+    return self.wasmVersion();
 });
 EM_JS(int, callNumFiles, (), {
-    return window.wasmNumFiles();
+    return self.wasmNumFiles();
 });
 EM_JS(uint8_t*, callBuffer, (int n), {
-    return window.wasmFileBuffer(n);
+    return self.wasmFileBuffer(n);
 });
 EM_JS(const char*, callPath, (int n), {
-    return window.wasmFilePath(n);
+    return self.wasmFilePath(n);
 });
 EM_JS(size_t, callSize, (int n), {
-    return window.wasmFileSize(n);
+    return self.wasmFileSize(n);
 });
 
 EMSCRIPTEN_KEEPALIVE
 void chdWebEntry() {
+    fprintf(stderr, "error log test\n");
     puts("wasm: chdWeb entrypoint invoked");
     int ver = callWasmVersion();
     printf("Got version from wasm: %d\n", ver);

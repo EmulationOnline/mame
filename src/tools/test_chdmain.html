@@ -29,155 +29,54 @@
         function log(text) {
             logE(text + "\n");
         }
-        // window.addEventListener('load', function() {
-        //     console.log('load');
-        //     window.addEventListener('error', function(v) {
-        //         log('ERROR: ' + v);
-        //     });
-        //     log('error hooked');
-        // });
 
-        async function shasumTest(file) {
-                log("Computing SHA-256 for first file: " + (file.webkitRelativePath || file.name));
-                try {
-                    var arrayBuffer = await file.arrayBuffer();
-                    var hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-                    var hashArray = Array.from(new Uint8Array(hashBuffer));
-                    var hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-                    log("SHA-256: " + hashHex);
-                } catch (err) {
-                    log("Error computing hash: " + err);
-                }
-        }
-    
-        function copyCStrToWasm(u8) {
-            // copy u8 bytes and add the null terminator at the end.
-            let n = u8.length;
-            let wasmHeap = Module._malloc(n+1);
-            let write = new Uint8Array(Module.HEAPU8.buffer,
-                    wasmHeap, n+1);
-            write.set(u8);
-            return wasmHeap;
-        }
+        var worker = new Worker('chd_worker.js');
 
-        async function initWasmFiles(files) {
-            // js interface requires async load for filebuffer.
-            // we eagerly load into object for compatibility.
-            let wasm = [];
-            log(`Found ${files.length} files.`);
-            for (let i = 0; i < files.length; i++) {
-                let file = files[i];
-                let path = file.webkitRelativePath || file.name;
-                let parts = path.split('/');
-                path = parts[parts.length - 1];  // pass basename only
-                logE(`${i+1}/${files.length}: Reading ${path} ...`);
-                let data = await file.arrayBuffer();
-                const size = data.byteLength;
-                log(`Done. (${size} bytes)`);
-                // Copy data
-                let wasmHeap = Module._malloc(size);
-                let write = new Uint8Array(Module.HEAPU8.buffer,
-                        wasmHeap, size);
-                let view = new Uint8Array(data);
-                write.set(view);
-                // for (let j = 0; j < 10; j++) {
-                //     log(`js f=${i}: ${j} = ${write[j]} vs ${view[j]}`);
-                // }
-                // Copy pathname
-                const strBytes = new TextEncoder().encode(path);
-                console.log('encoded: ', strBytes);
-                const wasmStr = copyCStrToWasm(strBytes);
-                wasm.push({
-                    path: wasmStr,
-                    ptr: wasmHeap,
-                    size: data.byteLength,
-                });
-            }
-            log('Finished listing files');
-            window.files = wasm;
-        }
-
-        function wasmGetFiles() {
-            return window.files || {};
-        }
-        function wasmNumFiles() {
-            let files = wasmGetFiles();
-            return files.length;
-        }
-        function getFile(n) {
-            let files = wasmGetFiles();
-            if (n >= 0 && n < wasmNumFiles()) {
-                return files[n];
-            } else {
-                return 0;
-            }
-        }
-        function wasmFilePath(n) {
-            return getFile(n).path;
-        }
-        function wasmFileBuffer(n) {
-            // buffers are addresses allocated on the wasm heap.
-            return getFile(n).ptr;
-        }
-        function wasmFileSize(n) {
-            return getFile(n).size;
-        }
-        function wasmVersion() {
-            return 123;
-        }
-
-        document.getElementById('folderInput').addEventListener('change', async function(e) {
-            var files = e.target.files;
-            log("Folder uploaded. Found " + files.length + " files.");
-            await initWasmFiles(files);
-            log('Finished reading files. Starting CHD conversion');
-            setTimeout(() => Module._chdWebEntry(), 1000);
-        });
-
-        var Module = {
-            preRun: [],
-            postRun: [],
-            print: function(text) {
-                log("stdout: " + text);
-            },
-            printErr: function(text) {
-                log("stderr: " + text);
-            },
-            onRuntimeInitialized: function() {
-                log("Runtime initialized.");
-                try {
-                    // chdmain_version is exported via EMSCRIPTEN_KEEPALIVE, so it should be available as _chdmain_version
-                    if (typeof Module._chdmain_version === 'function') {
-                        var version = Module._chdmain_version();
-                        log("chdmain_version returned: " + version);
-                    } else {
-                        log("Module._chdmain_version is not a function. Checking exports...");
-                         log("Keys in Module: " + Object.keys(Module).filter(k => k.indexOf('chdmain') !== -1));
-                    }
-                } catch(e) {
-                    log("Error calling chdmain_version: " + e);
-                }
+        worker.onmessage = function(e) {
+            var msg = e.data;
+            if (msg.type === 'stdout') {
+                log("stdout: " + msg.text);
+            } else if (msg.type === 'stderr') {
+                log("stderr: " + msg.text);
+            } else if (msg.type === 'ready') {
+                log("Worker Runtime initialized.");
+            } else if (msg.type === 'done') {
+                log("Worker finished.");
             }
         };
-    </script>
-    <script src="chdmain.js"></script>
-    <script>
-    /*
-        async function setup() {
-            const resp = await fetch('chdmain.wasm');
-            const buffer = await resp.arrayBuffer();
-            await WebAssembly.instantiate(buffer,
-            {
-                imports: {
-                    env: {
-                        _wasmGetFiles: wasmGetFiles,
-                        _wasmGetFile: wasmGetFile,
-                    }
-                },
-            });
-        }
-        setup();
-        */
+
+        worker.onerror = function(e) {
+            log("Worker Error: " + e.message);
+        };
+
+        document.getElementById('folderInput').addEventListener('change', async function(e) {
+            var fileList = e.target.files;
+            log("Folder uploaded. Found " + fileList.length + " files.");
+            
+            var filesToSend = [];
+            
+            for (let i = 0; i < fileList.length; i++) {
+                let file = fileList[i];
+                let path = file.webkitRelativePath || file.name;
+                let parts = path.split('/');
+                let filename = parts[parts.length - 1];  // pass basename only
+                
+                logE(`${i+1}/${fileList.length}: Reading ${filename} ...`);
+                let data = await file.arrayBuffer();
+                log(`Done. (${data.byteLength} bytes)`);
+                
+                filesToSend.push({
+                    name: filename,
+                    data: data
+                });
+            }
+
+            log('Finished reading files. Sending to worker...');
+            
+            // Transfer the ArrayBuffers to the worker to avoid copying
+            var transferables = filesToSend.map(f => f.data);
+            worker.postMessage({ type: 'start', files: filesToSend }, transferables);
+        });
     </script>
     <p>Note: This tool uses open source code from MAME, available under the GPL
     v2 license. Our modifications, as well as the full license, are available
