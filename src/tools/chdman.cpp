@@ -3592,9 +3592,11 @@ void chdWebEntry() {
     int n = callNumFiles();
     printf("Num files: %d\n", n);
     std::string cuePath;
+    size_t total_input_size = 0;
     for (int i = 0; i < n; i++) {
         const char* filename = callPath(i);
         size_t len = callSize(i);
+        total_input_size += len;
         uint8_t* buf = callBuffer(i);
         printf("chdweb: found %s (%lu bytes)\n", filename, len);
         MemFile memfile = {
@@ -3613,12 +3615,12 @@ void chdWebEntry() {
             }
             cuePath = filename;
         }
-    //     printf("file %d = %s\n", i, callPath(i));
-    //     for (int j = 0; j < 10; j++) {
-    //         uint8_t* ptr = callBuffer(i);
-    //         printf("[%d] = %hhu\n", j, ptr[j]);
-    //     }
     }
+
+    // Reserve space for output to avoid frequent reallocations.
+    // The output compressed CHD is usually smaller than input, but uncompressed could be larger (headers).
+    // Conservatively reserving input size is a safe optimization for performance.
+    s_outBuffer.reserve(total_input_size);
 
     parameters_map params;
     std::string input = cuePath;
