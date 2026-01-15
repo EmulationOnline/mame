@@ -3705,9 +3705,12 @@ int demo_main(int argc, const char **argv) {
     parameters_map params;
     std::string input = infile;
     std::string output = outfile;
+    std::string procs = "1";
     params[OPTION_INPUT] = &input;
     params[OPTION_OUTPUT] =  &output;
+    // params[OPTION_NUMPROCESSORS] = &procs;  // Add for wasm.
     do_create_cd(params);
+    printf("generated output size: %ld bytes\n", s_outBuffer.size());
     return 0;
 }
 

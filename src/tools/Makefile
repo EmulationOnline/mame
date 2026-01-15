@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -DCRLF=2 -I../osd -I../lib/util -I../../3rdparty -I../../3rdparty/zlib -I../../3rdparty/flac/include -I../../3rdparty/flac/src/libFLAC/include/ -I../../3rdparty/utf8proc
-CFLAGS = -DPACKAGE_VERSION="\"chdweb_emulationonline\"" -DCRLF=2 -I../osd -I../lib/util -I../../3rdparty -I../../3rdparty/zlib -I../../3rdparty/flac/include -I../../3rdparty/flac/src/libFLAC/include/ -I../../3rdparty/utf8proc -DHAVE_LROUND -DFLAC__HAS_OGG=0 -DHAVE_STDINT_H -DHAVE_INTTYPES_H
+CFLAGS = -DPACKAGE_VERSION="\"chdweb_emulationonline\"" -DCRLF=2 -I../osd -I../lib/util -I../../3rdparty -I../../3rdparty/zlib -I../../3rdparty/flac/include -I../../3rdparty/flac/src/libFLAC/include/ -I../../3rdparty/utf8proc -DHAVE_LROUND -DFLAC__HAS_OGG=0 -DHAVE_STDINT_H -DHAVE_INTTYPES_H -DNDEBUG
 LIBS = -lpthread
 
 SRCS = chdman.cpp \
