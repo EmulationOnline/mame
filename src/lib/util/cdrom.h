@@ -292,7 +292,8 @@ private:
 	/** @brief  Information describing the track. */
 	track_input_info     cdtrack_info;       /* track info */
 	/** @brief  The fhandle[ CD maximum tracks]. */
-	util::random_read::ptr fhandle[MAX_TRACKS];/* file handle */
+	// util::random_read::ptr fhandle[MAX_TRACKS];/* file handle */
+    void *fhandle[MAX_TRACKS];
 
 	inline uint32_t physical_to_chd_lba(uint32_t physlba, uint32_t &tracknum) const;
 	inline uint32_t logical_to_chd_lba(uint32_t physlba, uint32_t &tracknum) const;

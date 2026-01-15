@@ -2180,7 +2180,7 @@ static void do_create_cd(parameters_map &params)
         puts("Processing Table of Contents...");
 		std::error_condition err = cdrom_file::parse_toc(*input_file_str->second, toc, track_info);
 		if (err)
-			report_error(1, "Error parsing input file (%s: %s)\n", *input_file_str->second, err.message());
+			report_error(1, "Error parsing ToC file (%s: %s)\n", *input_file_str->second, err.message());
 	}
 
     puts("Processing arguments...");
@@ -3593,10 +3593,11 @@ void chdWebEntry() {
     for (int i = 0; i < n; i++) {
         const char* filename = callPath(i);
         size_t len = callSize(i);
+        uint8_t* buf = callBuffer(i);
         printf("chdweb: found %s (%lu bytes)\n", filename, len);
         MemFile memfile = {
             .filename = filename,
-            .ptr = 0,
+            .ptr = buf,
             .len = len,
             .pos = 0,
         };

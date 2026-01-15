@@ -153,7 +153,7 @@ static size_t memfile_read(void *ptr, size_t size, size_t nmemb, void *stream){
     return items;
 }
 static size_t memfile_write(const void *ptr, size_t size, size_t nmemb, void *stream){
-    puts("mem read");
+    puts("mem write");
     MemFile* f= (MemFile*)stream;
     if (f->ptr) {
         printf("Cannot write to memfile! (f=%s)\n", f->filename);
@@ -188,7 +188,7 @@ static int memfile_seek(void *stream, long offset, int whence){
             printf("unknown WHENCE(%d) for mem_seek, skipping\n", whence);
             return buf->pos;
     }
-    if (newpos >= 0 && newpos < buf->len) {
+    if (newpos >= 0 && newpos <= buf->len) {
         buf->pos = newpos;
     } else {
         puts("Cannot mem_seek OOB, ignoring.");
@@ -214,15 +214,17 @@ static char *memfile_gets(char *s, int size, void *stream){
         // at eof, no bytes will be returned
         return NULL;
     }
-    for (int i = 0; i < size && f->pos < f->len; i++) {
+    int i = 0;
+    for (; i < size - 1 && f->pos < f->len; i++) {
         char c = f->ptr[f->pos];
         f->pos++;
-        if (c == '\n' || c == '\r' || c == '\0') {
-            break;
-        }
         *s = c;
         s++;
+        if (c == '\n' || c == '\r') {
+            break;
+        }
     }
+    *s = 0;
 
     // return dst on success
     return dst;
@@ -357,15 +359,19 @@ cdrom_file::cdrom_file(std::string_view inputfile)
 
 	for (int i = 0; i < cdtoc.numtrks; i++)
 	{
-		osd_file::ptr file;
+		// osd_file::ptr file;
 		std::uint64_t length;
-		std::error_condition const filerr = osd_file::open(cdtrack_info.track[i].fname, OPEN_FLAG_READ, file, length);
-		if (filerr)
+		// std::error_condition const filerr = osd_file::open(cdtrack_info.track[i].fname, OPEN_FLAG_READ, file, length);
+        void* file = s_fsFuncs.open(cdtrack_info.track[i].fname.c_str(), "rt");
+        length = s_fsFuncs.seek(file, 0, SEEK_END);
+        s_fsFuncs.seek(file, 0, SEEK_SET);  // rewind.
+		// if (filerr)
+		if (!file)
 		{
 			osd_printf_error("Unable to open file: %s\n", cdtrack_info.track[i].fname);
 			throw nullptr;
 		}
-		fhandle[i] = util::osd_file_read(std::move(file));
+		fhandle[i] = file; // util::osd_file_read(std::move(file));
 		if (!fhandle[i])
 		{
 			osd_printf_error("Unable to open file: %s\n", cdtrack_info.track[i].fname);
@@ -552,7 +558,8 @@ cdrom_file::~cdrom_file()
 	{
 		for (int i = 0; i < cdtoc.numtrks; i++)
 		{
-			fhandle[i].reset();
+			s_fsFuncs.close(fhandle[i]);
+			// fhandle[i].reset();
 		}
 	}
 }
@@ -615,7 +622,8 @@ std::error_condition cdrom_file::read_partial_sector(void *dest, uint32_t lbasec
 	else
 	{
 		// else read from the appropriate file
-		util::random_read &srcfile = *fhandle[tracknum];
+		// util::random_read &srcfile = *fhandle[tracknum];
+        void *srcFile = fhandle[tracknum];
 
 		int bytespersector = cdtoc.tracks[tracknum].datasize + cdtoc.tracks[tracknum].subsize;
 		uint64_t sourcefileoffset = cdtrack_info.track[tracknum].offset;
@@ -628,10 +636,12 @@ std::error_condition cdrom_file::read_partial_sector(void *dest, uint32_t lbasec
 		if (EXTRA_VERBOSE)
 			osd_printf_verbose("Reading %u bytes from sector %d from track %d at offset %lu\n", (unsigned)length, chdsector, tracknum + 1, (unsigned long)sourcefileoffset);
 
-		result = srcfile.seek(sourcefileoffset, SEEK_SET);
+		/*result = */s_fsFuncs.seek(srcFile, sourcefileoffset, SEEK_SET);
+		// result = srcfile.seek(sourcefileoffset, SEEK_SET);
 		size_t actual;
 		if (!result)
-			std::tie(result, actual) = read(srcfile, dest, length);
+            actual = s_fsFuncs.read(dest, length, 1, srcFile);
+			// std::tie(result, actual) = read(srcfile, dest, length);
 		// FIXME: if (!result && (actual < length)) report error
 
 		needswap = cdtrack_info.track[tracknum].swap;
@@ -1704,12 +1714,17 @@ std::string cdrom_file::get_file_path(std::string &path)
 
 uint64_t cdrom_file::get_file_size(std::string_view filename)
 {
-	osd_file::ptr file;
-	std::uint64_t filesize = 0;
+    void *file = s_fsFuncs.open(filename.data(), "rt");
+    int size = s_fsFuncs.seek(file, 0, SEEK_END);
+    s_fsFuncs.seek(file, 0, SEEK_END);
+    s_fsFuncs.close(file);
+    return size;
+	// osd_file::ptr file;
+	// std::uint64_t filesize = 0;
 
-	osd_file::open(std::string(filename), OPEN_FLAG_READ, file, filesize); // FIXME: allow osd_file to accept std::string_view
+	// osd_file::open(std::string(filename), OPEN_FLAG_READ, file, filesize); // FIXME: allow osd_file to accept std::string_view
 
-	return filesize;
+	// return filesize;
 }
 
 
@@ -2586,6 +2601,7 @@ std::error_condition cdrom_file::parse_cue(std::string_view tocfname, toc &outto
 		/* get the next line */
 		if (!s_fsFuncs.gets(linebuffer, 511, infile))
 			break;
+        printf("DEBUG: line='%s'\n", linebuffer);
 
 		i = 0;
 
@@ -2859,15 +2875,18 @@ std::error_condition cdrom_file::parse_cue(std::string_view tocfname, toc &outto
 
 	/* close the input CUE */
 	s_fsFuncs.close(infile);
+    puts("finished reading cue file.");
 
 	/* store the number of tracks found */
 	outtoc.numtrks = trknum + 1;
 	outtoc.numsessions = sessionnum + 1;
 
+    printf("Starting to process %d tracks.\n", outtoc.numtrks);
 	/* now go over the files again and set the lengths */
 	for (trknum = 0; trknum < outtoc.numtrks; trknum++)
 	{
 		uint64_t tlen = 0;
+        printf("Track %d\n", trknum);
 
 		if (outinfo.track[trknum].idx[1] == -1)
 		{
@@ -2986,6 +3005,7 @@ std::error_condition cdrom_file::parse_cue(std::string_view tocfname, toc &outto
 			}
 		}
 	}
+    puts("Finished processing track lengths.");
 
 	if (is_gdrom)
 	{
@@ -3075,7 +3095,7 @@ bool cdrom_file::is_gdicue(std::string_view tocfname)
 	bool has_rem_highdensity = false;
 	std::string path = std::string(tocfname);
 
-	FILE *infile = fopen(path.c_str(), "rt");
+	void *infile = s_fsFuncs.open(path.c_str(), "rt");
 	if (!infile)
 	{
 		return false;
@@ -3086,9 +3106,9 @@ bool cdrom_file::is_gdicue(std::string_view tocfname)
 	char linebuffer[512];
 	memset(linebuffer, 0, sizeof(linebuffer));
 
-	while (!feof(infile))
+	while (!s_fsFuncs.eof(infile))
 	{
-		if (!fgets(linebuffer, 511, infile))
+		if (!s_fsFuncs.gets(linebuffer, 511, infile))
 			break;
 
 		int i = 0;
@@ -3108,7 +3128,7 @@ bool cdrom_file::is_gdicue(std::string_view tocfname)
 		}
 	}
 
-	fclose(infile);
+	s_fsFuncs.close(infile);
 
 	return has_rem_singledensity && has_rem_highdensity;
 }
