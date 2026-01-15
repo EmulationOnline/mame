@@ -1282,16 +1282,17 @@ static std::tuple<uint64_t, uint64_t, uint64_t> parse_input_start_end(
 
 static void check_existing_output_file(const parameters_map &params, std::string_view filename)
 {
-	if (params.find(OPTION_OUTPUT_FORCE) == params.end())
-	{
-		util::core_file::ptr file;
-		std::error_condition const filerr = util::core_file::open(filename, OPEN_FLAG_READ, file);
-		if (!filerr)
-		{
-			file.reset();
-			report_error(1, "Error: file already exists (%s)\nUse --force (or -f) to force overwriting", filename);
-		}
-	}
+    // memfile: produced w/o output file, no need to check.
+	// if (params.find(OPTION_OUTPUT_FORCE) == params.end())
+	// {
+	// 	util::core_file::ptr file;
+	// 	std::error_condition const filerr = util::core_file::open(filename, OPEN_FLAG_READ, file);
+	// 	if (!filerr)
+	// 	{
+	// 		file.reset();
+	// 		report_error(1, "Error: file already exists (%s)\nUse --force (or -f) to force overwriting", filename);
+	// 	}
+	// }
 }
 
 
@@ -2228,8 +2229,9 @@ static void do_create_cd(parameters_map &params)
 	try
 	{
 		// create the new CD
-        puts("Creating output file...");
+        puts("Creating output compressor...");
 		auto chd = std::make_unique<chd_cd_compressor>(toc, track_info);
+        puts("Creating output chd...");
 		create_output_chd(*chd, *output_chd_str, uint64_t(totalsectors) * cdrom_file::FRAME_SIZE, hunk_size, cdrom_file::FRAME_SIZE, compression, output_parent);
 
 		// add the standard CD metadata; we do this even if we have a parent because it might be different
@@ -3436,7 +3438,7 @@ static void do_list_templates(parameters_map &params)
 //  main - entry point
 //-------------------------------------------------
 
-int CLIB_DECL main(int argc, char *argv[])
+int CLIB_DECL bin_main(int argc, char *argv[])
 {
 	const std::vector<std::string> args = osd_get_command_line(argc, argv);
 	chdman_osd_output osdoutput;
@@ -3627,7 +3629,88 @@ void chdWebEntry() {
     do_create_cd(params);
     printf("Finished createcd. Output size: %lu bytes\n", s_outBuffer.size());
 }
-
-
 }  // extern "C"
+
 #endif
+
+#include <unistd.h>
+#include <fcntl.h>
+size_t slurp(const char*filename, uint8_t** out) {
+    size_t pos = 0;
+    int fd = open(filename, 0);
+    if (fd == -1) {
+        perror("open fail: ");
+        exit(1);
+    }
+    off_t result = lseek(fd, 0, SEEK_END); 
+    printf("lseek returned: %ld\n", result);
+    if (result < 0) {
+        perror("seek failed: ");
+        exit(1);
+    }
+    const size_t capacity = result;
+    *out = (uint8_t*)malloc(capacity);
+    lseek(fd, 0, SEEK_SET);
+    while (1) {
+        ssize_t count = read(fd, *out + pos, capacity - pos);
+        printf("read returned %ld\n", count);
+        if (count < 0) {
+            perror("read fail: ");
+            exit(1);
+        }
+        if (count == 0) break;
+        pos += count;
+    }
+    close(fd);
+    return pos;
+}
+void demo_slurp_files(const char* cuefile, const char* binfile) {
+    // setup memfiles for a simple single-bin image.
+    auto setup_memfile = [](const char* filename) {
+        printf("Setting up %s\n", filename);
+        size_t len = strlen(filename);
+        printf("filename.strlen = %lu\n", len);
+        char *fbuffer = (char*)malloc(len + 1);
+        puts("about to strcpy");
+        strcpy(fbuffer, filename);
+        printf("copied fname: %s\n", fbuffer);
+        uint8_t* buffer = nullptr;
+        puts("about to slurp");
+        size_t bytes = slurp(filename, &buffer);
+        printf("Read %s, %lu bytes\n", fbuffer, bytes);
+        MemFile memfile = {
+            .filename = fbuffer,
+            .ptr = buffer,
+            .len = bytes,
+            .pos = 0,
+        };
+        s_memFiles.push_back(memfile);
+    };
+    setup_memfile(cuefile);
+    setup_memfile(binfile);
+}
+
+int demo_main(int argc, const char **argv) {
+    // new main using the wasm entry point, to better exercise the memfile
+    // codepaths natively with a debugger.
+    // usage: ./chdman input.cue output.chd
+    if (argc != 4) {
+        puts("usage: ./chdman input.cue input.bin output.chd");
+        return 0;
+    }
+    const char* infile = argv[1];
+    const char* binfile = argv[2];
+    const char* outfile = argv[3];
+    demo_slurp_files(infile, binfile);
+    parameters_map params;
+    std::string input = infile;
+    std::string output = outfile;
+    params[OPTION_INPUT] = &input;
+    params[OPTION_OUTPUT] =  &output;
+    do_create_cd(params);
+    return 0;
+}
+
+int main(int argc, const char** argv) {
+    return demo_main(argc, argv);
+}

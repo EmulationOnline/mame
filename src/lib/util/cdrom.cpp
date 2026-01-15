@@ -137,98 +137,135 @@ static void *memfile_open(const char *filename, const char *mode) {
     }
 }
 static int memfile_close(void *stream) {
-    MemFile* f = (MemFile*)stream;
-    f->pos = 0;
-    return 0;
+    if ((void*)&s_outBuffer == stream) {
+        return 0;
+    } else {
+        MemFile* f = (MemFile*)stream;
+        f->pos = 0;
+        return 0;
+    }
 }
 
 static size_t memfile_read(void *ptr, size_t size, size_t nmemb, void *stream){
     puts("mem read");
-    MemFile* f= (MemFile*)stream;
-    size_t bytes_left = f->len - f->pos;
-    size_t items_left = bytes_left / size;
-    size_t items = nmemb < items_left ? nmemb : items_left;
-    memcpy(ptr, f->ptr + f->pos, items * size);
-    f->pos += items * size;
-    return items;
+    if ((void*)&s_outBuffer == stream) {
+        puts("reads from output memfile are not supported.");
+        return 0;
+    } else {
+        MemFile* f= (MemFile*)stream;
+        size_t bytes_left = f->len - f->pos;
+        size_t items_left = bytes_left / size;
+        size_t items = nmemb < items_left ? nmemb : items_left;
+        memcpy(ptr, f->ptr + f->pos, items * size);
+        f->pos += items * size;
+        return items;
+    }
 }
 static size_t memfile_write(const void *ptr, size_t size, size_t nmemb, void *stream){
     puts("mem write");
-    MemFile* f= (MemFile*)stream;
-    if (f->ptr) {
-        printf("Cannot write to memfile! (f=%s)\n", f->filename);
+    if ((void*)&s_outBuffer == stream) {
+        size_t bytes = size * nmemb;
+        size_t next_index = s_outBuffer.size();
+        s_outBuffer.resize(next_index + bytes);
+        memcpy(s_outBuffer.data(), ptr, bytes);
+        return nmemb;
+    } else {
+        MemFile* f= (MemFile*)stream;
+        if (f->ptr) {
+            printf("Cannot write to memfile! (f=%s)\n", f->filename);
+            return 0;
+        }
         return 0;
     }
-    return 0;
 }
 static int memfile_seek(void *stream, long offset, int whence){
     puts("mem seek");
-    MemFile* buf = (MemFile*)stream;
-    int newpos = 0;
-    switch (whence) {
-        case SEEK_SET:
-            puts("mem SEEK_SET");
-            // The file offset is set to offset bytes.
-            // NOTE: unix lseek allows increasing size of file / writing
-            // beyond by tracking the 'hole size'. We dont support that
-            // on strings, so will fail if seeked OOB.
-            newpos = offset;
-            break;
-        case SEEK_CUR:
-            puts("mem SEEK_CUR");
-            // The file offset is set to its current location plus offset bytes.
-            newpos = offset + buf->pos;
-            break;
-        case SEEK_END:
-            puts("mem SEEK_END");
-            // The file offset is set to the size of the file plus offset bytes.
-            newpos = offset + buf->len;
-            break;
-        default:
-            printf("unknown WHENCE(%d) for mem_seek, skipping\n", whence);
-            return buf->pos;
-    }
-    if (newpos >= 0 && newpos <= buf->len) {
-        buf->pos = newpos;
+    if ((void*)&s_outBuffer == stream) {
+        puts("seek() on output memfile is not supported.");
+        return 0;
     } else {
-        puts("Cannot mem_seek OOB, ignoring.");
+        MemFile* buf = (MemFile*)stream;
+        int newpos = 0;
+        switch (whence) {
+            case SEEK_SET:
+                puts("mem SEEK_SET");
+                // The file offset is set to offset bytes.
+                // NOTE: unix lseek allows increasing size of file / writing
+                // beyond by tracking the 'hole size'. We dont support that
+                // on strings, so will fail if seeked OOB.
+                newpos = offset;
+                break;
+            case SEEK_CUR:
+                puts("mem SEEK_CUR");
+                // The file offset is set to its current location plus offset bytes.
+                newpos = offset + buf->pos;
+                break;
+            case SEEK_END:
+                puts("mem SEEK_END");
+                // The file offset is set to the size of the file plus offset bytes.
+                newpos = offset + buf->len;
+                break;
+            default:
+                printf("unknown WHENCE(%d) for mem_seek, skipping\n", whence);
+                return buf->pos;
+        }
+        if (newpos >= 0 && newpos <= buf->len) {
+            buf->pos = newpos;
+        } else {
+            puts("Cannot mem_seek OOB, ignoring.");
+        }
+        return buf->pos;
     }
-    return buf->pos;
 }
+
 static long memfile_tell(void *stream){
     puts("mem tell");
-    MemFile* f= (MemFile*)stream;
-    return f->pos;
+    if ((void*)&s_outBuffer == stream) {
+        return s_outBuffer.size();
+    } else {
+        MemFile* f= (MemFile*)stream;
+        return f->pos;
+    }
 }
 static int memfile_eof(void *stream){
     puts("mem eof()");
-    MemFile* f= (MemFile*)stream;
-    printf("current pos: %lu / %lu\n", f->pos, f->len);
-    return f->pos >= f->len;
+    if ((void*)&s_outBuffer == stream) {
+        return 0;
+    } else {
+        MemFile* f= (MemFile*)stream;
+        printf("current pos: %lu / %lu\n", f->pos, f->len);
+        return f->pos >= f->len;
+    }
 }
+
 static char *memfile_gets(char *s, int size, void *stream){
     puts("mem gets");
-    MemFile* f= (MemFile*)stream;
-    char *const dst = s;
-    if (f->pos >= f->len) {
-        // at eof, no bytes will be returned
-        return NULL;
-    }
-    int i = 0;
-    for (; i < size - 1 && f->pos < f->len; i++) {
-        char c = f->ptr[f->pos];
-        f->pos++;
-        *s = c;
-        s++;
-        if (c == '\n' || c == '\r') {
-            break;
+    if ((void*)&s_outBuffer == stream) {
+        puts("gets() on output memfile not supported.");
+        return 0;
+    } else {
+        MemFile* f= (MemFile*)stream;
+        char *const dst = s;
+        if (f->pos >= f->len) {
+            // at eof, no bytes will be returned
+            return NULL;
         }
+        int i = 0;
+        for (; i < size - 1 && f->pos < f->len; i++) {
+            char c = f->ptr[f->pos];
+            f->pos++;
+            *s = c;
+            s++;
+            if (c == '\n' || c == '\r') {
+                break;
+            }
+        }
+        *s = 0;
+        // return dst on success
+        return dst;
     }
-    *s = 0;
-
-    // return dst on success
-    return dst;
 }
+
 static FsFuncs s_fsFuncs = {
 	.open = memfile_open,
 	.close = memfile_close,
