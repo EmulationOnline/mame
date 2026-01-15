@@ -87,7 +87,7 @@ static void spin_while_not(const volatile _AtomType * volatile atom, const _Main
 
 int osd_get_num_processors(bool heavy_mt)
 {
-#if defined(SDLMAME_EMSCRIPTEN)
+#if defined(__EMSCRIPTEN__)
 	// multithreading is not supported at this time
 	return 1;
 #else
@@ -275,7 +275,7 @@ osd_work_queue *osd_work_queue_alloc(int flags)
 	if (osdworkqueuemaxthreads != nullptr && sscanf(osdworkqueuemaxthreads, "%d", &osdthreadnum) == 1 && threadnum > osdthreadnum)
 		threadnum = osdthreadnum;
 
-#if defined(SDLMAME_EMSCRIPTEN)
+#if defined(__EMSCRIPTEN__)
 	// threads are not supported at all
 	threadnum = 0;
 #endif

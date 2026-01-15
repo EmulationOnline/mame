@@ -35,6 +35,116 @@ struct MemFile {
 extern std::vector<MemFile> s_memFiles;
 extern std::vector<uint8_t> s_outBuffer;
 
+class MemFileAdapter : public util::random_read_write
+{
+public:
+	MemFileAdapter(const MemFile* memfile) : m_memfile(memfile), m_pos(0) { }
+	MemFileAdapter() : m_memfile(nullptr), m_pos(0) { }
+
+	virtual std::error_condition read_some(void *buffer, std::size_t length, std::size_t &actual) noexcept override
+	{
+		const uint8_t* ptr = nullptr;
+		size_t size = 0;
+
+		if (m_memfile)
+		{
+			ptr = m_memfile->ptr;
+			size = m_memfile->len;
+		}
+		else
+		{
+			ptr = s_outBuffer.data();
+			size = s_outBuffer.size();
+		}
+
+		if (m_pos >= size)
+		{
+			actual = 0;
+			return std::error_condition();
+		}
+		actual = std::min(length, size - (size_t)m_pos);
+		memcpy(buffer, ptr + m_pos, actual);
+		m_pos += actual;
+		return std::error_condition();
+	}
+
+	virtual std::error_condition write_some(void const *buffer, std::size_t length, std::size_t &actual) noexcept override
+	{
+		if (m_memfile)
+			return std::errc::permission_denied;
+
+		if (m_pos + length > s_outBuffer.size())
+			s_outBuffer.resize(m_pos + length);
+		
+		memcpy(s_outBuffer.data() + m_pos, buffer, length);
+		m_pos += length;
+		actual = length;
+		return std::error_condition();
+	}
+
+	virtual std::error_condition finalize() noexcept override { return std::error_condition(); }
+	virtual std::error_condition flush() noexcept override { return std::error_condition(); }
+
+	virtual std::error_condition seek(std::int64_t offset, int whence) noexcept override
+	{
+		size_t size = m_memfile ? m_memfile->len : s_outBuffer.size();
+		uint64_t new_pos = 0;
+		switch (whence)
+		{
+		case SEEK_SET: new_pos = offset; break;
+		case SEEK_CUR: new_pos = m_pos + offset; break;
+		case SEEK_END: new_pos = size + offset; break;
+		default: return std::errc::invalid_argument;
+		}
+		m_pos = new_pos;
+		return std::error_condition();
+	}
+
+	virtual std::error_condition tell(std::uint64_t &result) noexcept override
+	{
+		result = m_pos;
+		return std::error_condition();
+	}
+
+	virtual std::error_condition length(std::uint64_t &result) noexcept override
+	{
+		result = m_memfile ? m_memfile->len : s_outBuffer.size();
+		return std::error_condition();
+	}
+
+	virtual std::error_condition read_some_at(std::uint64_t offset, void *buffer, std::size_t length, std::size_t &actual) noexcept override
+	{
+		const uint8_t* ptr = m_memfile ? m_memfile->ptr : s_outBuffer.data();
+		size_t size = m_memfile ? m_memfile->len : s_outBuffer.size();
+
+		if (offset >= size)
+		{
+			actual = 0;
+			return std::error_condition();
+		}
+		actual = std::min(length, size - (size_t)offset);
+		memcpy(buffer, ptr + offset, actual);
+		return std::error_condition();
+	}
+
+	virtual std::error_condition write_some_at(std::uint64_t offset, void const *buffer, std::size_t length, std::size_t &actual) noexcept override
+	{
+		if (m_memfile)
+			return std::errc::permission_denied;
+
+		if (offset + length > s_outBuffer.size())
+			s_outBuffer.resize(offset + length);
+
+		memcpy(s_outBuffer.data() + offset, buffer, length);
+		actual = length;
+		return std::error_condition();
+	}
+
+private:
+	const MemFile* m_memfile;
+	uint64_t m_pos;
+};
+
 // END CHDWeb
 
 class cdrom_file {

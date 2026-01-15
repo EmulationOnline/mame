@@ -14,6 +14,7 @@
 #include "osdcore.h"
 #include "unicode.h"
 #include "vecstream.h"
+#include "cdrom.h"
 
 #include <cassert>
 #include <cstring>
@@ -850,6 +851,68 @@ std::error_condition core_osd_file::flush() noexcept
 
 std::error_condition core_file::open(std::string_view filename, std::uint32_t openflags, ptr &file) noexcept
 {
+	for (const auto& mf : s_memFiles)
+	{
+		if (mf.filename == filename)
+		{
+			try
+			{
+				// Use util::random_read_write wrapper for MemFileAdapter if needed, 
+				// but here we probably need to instantiate a core_basic_file that wraps it?
+				// Actually core_file has no constructor taking random_read_write directly.
+				// But we can use open_proxy if we had a core_file.
+				
+				// Let's make a new class `core_mem_adapter_file` inheriting from `core_basic_file` 
+				// that uses `MemFileAdapter` logic internally, or just implement it directly here.
+				// Since we can't easily change inheritance here, let's look at `core_osd_file`.
+				// It wraps `osd_file`. 
+				
+				// Wait, MemFileAdapter inherits from `util::random_read_write`, which is a stream interface.
+				// `core_file` is the high-level interface.
+				// `core_osd_file` implements `core_file` by using `osd_file`.
+				
+				// We can implement `core_mem_adapter_file` locally or just reuse `core_in_memory_file`?
+				// `core_in_memory_file` takes a buffer. `MemFile` has a buffer.
+				// So we can just use `core_in_memory_file`!
+				
+				// If MemFile::ptr is null (output), we can't use core_in_memory_file easily for writing 
+				// because it expects a fixed buffer or allocates its own.
+				// `s_outBuffer` is dynamic.
+				
+				// The easiest way is to modify `core_file::open` to create a `core_in_memory_file` 
+				// if reading from a MemFile.
+				
+				if (mf.ptr)
+				{
+					// Read-only memory file
+					file = std::unique_ptr<core_file>(new core_in_memory_file(openflags, mf.ptr, mf.len, false));
+					return std::error_condition();
+				}
+				else
+				{
+					// This is the output file case (s_outBuffer). 
+					// core_in_memory_file doesn't support growing writes easily.
+					// But wait, the user wants to read inputs from MemFiles.
+					// Output handling is done via chd_file::create which uses MemFileAdapter directly.
+					// So for core_file::open, we are mostly concerned with inputs (READ).
+					
+					// If we try to open an output file via core_file::open (e.g. overwriting?), 
+					// it might be an issue. But typically outputs use `create`.
+					
+					// If openflags has write, and it's a MemFile, we might be in trouble if we expect to write.
+					// But if it is read-only input, we are good.
+					
+					if (openflags & OPEN_FLAG_WRITE)
+						return std::errc::permission_denied; // MemFiles are read-only inputs mostly?
+						
+					file = std::unique_ptr<core_file>(new core_in_memory_file(openflags, mf.ptr, mf.len, false));
+					return std::error_condition();
+				}
+			}
+			catch (...) { return std::errc::not_enough_memory; }
+		}
+	}
+
 	// attempt to open the file
 	osd_file::ptr f;
 	std::uint64_t length = 0;
