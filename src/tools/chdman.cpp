@@ -3625,14 +3625,16 @@ void chdWebEntry() {
     // Reserve space for output to avoid frequent reallocations.
     // The output compressed CHD is usually smaller than input, but uncompressed could be larger (headers).
     // Conservatively reserving input size is a safe optimization for performance.
-    s_outBuffer.reserve(total_input_size);
+    s_outBuffer.reserve(total_input_size / 2);
 
     parameters_map params;
     std::string input = cuePath;
     std::string output = cuePath;
     memcpy(output.data() + (cuePath.size() - 3), "chd", 3);
+    std::string compression = "cdzl";
     params[OPTION_INPUT] = &input;
     params[OPTION_OUTPUT] =  &output;
+    params[OPTION_COMPRESSION] = &compression;
     do_create_cd(params);
     printf("Finished createcd. Output size: %lu bytes\n", s_outBuffer.size());
 

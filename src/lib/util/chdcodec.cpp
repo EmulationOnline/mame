@@ -1301,7 +1301,9 @@ uint32_t chd_lzma_compressor::compress(const uint8_t *src, uint32_t srclen, uint
 
 		if (res != SZ_OK)
 		{
-			std::cerr << "LzmaEnc_MemEncode failed: " << res << std::endl;
+			std::cerr << "LzmaEnc_MemEncode failed: " << res 
+                      << " srclen=" << srclen 
+                      << " src[0-3]=" << std::hex << (int)src[0] << " " << (int)src[1] << " " << (int)src[2] << " " << (int)src[3] << std::dec << std::endl;
             return 0;
 		}
 
