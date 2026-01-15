@@ -1269,12 +1269,17 @@ chd_lzma_compressor::~chd_lzma_compressor()
 //  compress - compress data using the LZMA codec
 //-------------------------------------------------
 
+#include <iostream>
+
 uint32_t chd_lzma_compressor::compress(const uint8_t *src, uint32_t srclen, uint8_t *dest)
 {
 	// allocate the encoder
 	CLzmaEncHandle encoder = LzmaEnc_Create(&m_allocator);
 	if (encoder == nullptr)
+	{
+		std::cerr << "LzmaEnc_Create failed" << std::endl;
 		return 0; // Return 0 instead of throwing to indicate compression failure/fallback
+	}
 
 	try
 	{
@@ -1282,6 +1287,7 @@ uint32_t chd_lzma_compressor::compress(const uint8_t *src, uint32_t srclen, uint
 		SRes res = LzmaEnc_SetProps(encoder, &m_props);
 		if (res != SZ_OK)
         {
+            std::cerr << "LzmaEnc_SetProps failed: " << res << std::endl;
             LzmaEnc_Destroy(encoder, &m_allocator, &m_allocator);
             return 0;
         }
@@ -1294,12 +1300,16 @@ uint32_t chd_lzma_compressor::compress(const uint8_t *src, uint32_t srclen, uint
 		LzmaEnc_Destroy(encoder, &m_allocator, &m_allocator);
 
 		if (res != SZ_OK)
+		{
+			std::cerr << "LzmaEnc_MemEncode failed: " << res << std::endl;
             return 0;
+		}
 
 		return complen;
 	}
 	catch (...)
 	{
+		std::cerr << "Unknown exception in chd_lzma_compressor::compress" << std::endl;
 		// destroy before returning
 		LzmaEnc_Destroy(encoder, &m_allocator, &m_allocator);
 		return 0;

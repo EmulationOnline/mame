@@ -18,6 +18,8 @@
     </p>
     <br>
     <textarea id="log" rows="20" cols="100"></textarea>
+    <br>
+    <button id="downloadBtn" style="display:none; margin-top: 10px; padding: 10px 20px; font-size: 16px;">Download Result</button>
     <script>
         var logElement = document.getElementById('log');
         function logE(text) {
@@ -42,6 +44,22 @@
                 log("Worker Runtime initialized.");
             } else if (msg.type === 'done') {
                 log("Worker finished.");
+            } else if (msg.type === 'download') {
+                log("Conversion complete! (" + msg.buffer.byteLength + " bytes).");
+                log("Click the 'Download Result' button below to save your CHD file.");
+                
+                var blob = new Blob([msg.buffer], { type: 'application/octet-stream' });
+                if (window.lastDownloadUrl) URL.revokeObjectURL(window.lastDownloadUrl);
+                window.lastDownloadUrl = URL.createObjectURL(blob);
+                
+                var btn = document.getElementById('downloadBtn');
+                btn.onclick = function() {
+                    var a = document.createElement('a');
+                    a.href = window.lastDownloadUrl;
+                    a.download = 'output.chd';
+                    a.click();
+                };
+                btn.style.display = 'block';
             }
         };
 
@@ -50,6 +68,9 @@
         };
 
         document.getElementById('folderInput').addEventListener('change', async function(e) {
+            var btn = document.getElementById('downloadBtn');
+            if (btn) btn.style.display = 'none';
+
             var fileList = e.target.files;
             log("Folder uploaded. Found " + fileList.length + " files.");
             

@@ -3635,6 +3635,10 @@ void chdWebEntry() {
     params[OPTION_OUTPUT] =  &output;
     do_create_cd(params);
     printf("Finished createcd. Output size: %lu bytes\n", s_outBuffer.size());
+
+    EM_ASM({
+        self.workerDownload($0, $1);
+    }, s_outBuffer.data(), s_outBuffer.size());
 }
 }  // extern "C"
 
