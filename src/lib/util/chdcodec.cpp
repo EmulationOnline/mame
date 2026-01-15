@@ -1274,30 +1274,35 @@ uint32_t chd_lzma_compressor::compress(const uint8_t *src, uint32_t srclen, uint
 	// allocate the encoder
 	CLzmaEncHandle encoder = LzmaEnc_Create(&m_allocator);
 	if (encoder == nullptr)
-		throw std::error_condition(chd_file::error::COMPRESSION_ERROR);
+		return 0; // Return 0 instead of throwing to indicate compression failure/fallback
 
 	try
 	{
 		// configure the encoder
 		SRes res = LzmaEnc_SetProps(encoder, &m_props);
 		if (res != SZ_OK)
-			throw std::error_condition(chd_file::error::COMPRESSION_ERROR);
+        {
+            LzmaEnc_Destroy(encoder, &m_allocator, &m_allocator);
+            return 0;
+        }
 
 		// run it
 		SizeT complen = srclen;
 		res = LzmaEnc_MemEncode(encoder, dest, &complen, src, srclen, 0, nullptr, &m_allocator, &m_allocator);
-		if (res != SZ_OK)
-			throw std::error_condition(chd_file::error::COMPRESSION_ERROR);
-
-		// clean up
+		
+        // clean up
 		LzmaEnc_Destroy(encoder, &m_allocator, &m_allocator);
+
+		if (res != SZ_OK)
+            return 0;
+
 		return complen;
 	}
 	catch (...)
 	{
-		// destroy before re-throwing
+		// destroy before returning
 		LzmaEnc_Destroy(encoder, &m_allocator, &m_allocator);
-		throw;
+		return 0;
 	}
 }
 
